@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>AI Trip Planner Prototype</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <style>
+    :root{
+      --primary:#3498db;
+      --primary-dark:#2980b9;
+      --bg:#eef5fb;
+      --card-bg:rgba(255,255,255,0.6);
+      --glass-border:1px solid rgba(255,255,255,0.35);
+      --shadow:0 8px 24px rgba(0,0,0,0.12);
+      --radius:14px;
+    }
+    *{box-sizing:border-box}
+    body{
+      font-family: Arial, sans-serif;
+      margin:0;
+      background:
+        radial-gradient(1200px 800px at 10% -10%, #d6ecff 0%, transparent 60%),
+        radial-gradient(900px 700px at 110% 10%, #e8fffa 0%, transparent 60%),
+        var(--bg);
+      display:flex; flex-direction:column; min-height:100vh;
+      color:#1f2a37;
+    }
+
+    /* Top subtle bar */
+    .topbar{
+      position:sticky; top:0; z-index:10;
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      background:rgba(255,255,255,0.45);
+      border-bottom:var(--glass-border);
+    }
+    .topbar-inner{
+      max-width:1100px; margin:0 auto; padding:8px 20px;
+      display:flex; align-items:center; justify-content:space-between;
+      gap:12px;
+    }
+    .brand{
+      display:flex; align-items:center; gap:10px; font-weight:bold;
+      color:#0f172a;
+    }
+    .pill{
+      background:linear-gradient(135deg, var(--primary), #6dd5fa);
+      color:#fff; padding:6px 12px; border-radius:999px; font-size:12px;
+      box-shadow:0 6px 14px rgba(52,152,219,0.35);
+    }
+
+    header{
+      background: linear-gradient(135deg, var(--primary), #6dd5fa);
+      color:#fff; padding:28px 20px; text-align:center;
+      position:relative; overflow:hidden;
+    }
+    header:after{
+      content:""; position:absolute; inset:0;
+      background: radial-gradient(600px 200px at 50% -20%, rgba(255,255,255,0.25), transparent 60%);
+      pointer-events:none;
+    }
+    header h1{ margin:0; font-size:30px; letter-spacing:0.3px; }
+    header p{ margin:6px 0 0; font-size:14px; opacity:0.95; }
+
+    .content{ flex:1; }
+    .card{
+      background:var(--card-bg);
+      border:var(--glass-border);
+      border-radius:var(--radius);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      box-shadow:var(--shadow);
+      padding:20px;
+      margin:20px auto;
+      width:90%; max-width:700px;
+      transition: transform .2s ease, box-shadow .2s ease;
+    }
+    .card:hover{ transform: translateY(-2px); box-shadow:0 12px 30px rgba(0,0,0,0.16); }
+
+    h2{ margin-top:0; display:flex; align-items:center; gap:8px; }
+    label { display:block; margin-top:10px; font-weight:bold; }
+    input, select, button{
+      margin-top:6px; padding:10px; width:100%;
+      border:1px solid rgba(0,0,0,0.08);
+      border-radius:10px; background:#fff;
+      outline:none;
+      transition:border-color .2s ease, box-shadow .2s ease, transform .06s ease;
+    }
+    input:focus, select:focus{
+      border-color: var(--primary);
+      box-shadow:0 0 0 3px rgba(52,152,219,0.15);
+    }
+    button{
+      background:linear-gradient(135deg, var(--primary), #5fb4e6);
+      color:#fff; border:none; cursor:pointer; font-weight:bold;
+      letter-spacing:0.2px;
+    }
+    button:hover{ background: linear-gradient(135deg, var(--primary-dark), #4aa6db); }
+    button:active{ transform: scale(0.98); }
+
+    .button-row{
+      display:flex; gap:10px; flex-wrap:wrap;
+    }
+
+    .itinerary{
+      margin-top:15px; padding:12px; background:#ecf7ff;
+      border-radius:10px; border:1px solid rgba(52,152,219,0.2);
+    }
+    .day-card{
+      background:#fff; padding:12px;
+      border-left:5px solid var(--primary);
+      margin-top:10px; border-radius:10px;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.06);
+    }
+    .alerts{
+      margin-top:15px; padding:12px; background:#fff8e1;
+      border-left:5px solid #f39c12; border-radius:10px;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.06);
+    }
+    ul{ margin-top:10px; padding-left:20px; }
+    li{ margin:6px 0; }
+
+    iframe{
+      width:100%; height:320px; border:0; border-radius:12px; margin-top:15px;
+      box-shadow: 0 6px 18px rgba(0,0,0,0.12);
+    }
+
+    footer{
+      background:#0f172a; color:#e5e7eb; text-align:center;
+      padding:18px; font-size:14px; margin-top:auto;
+    }
+    footer a{ color:#34d399; text-decoration:none; margin:0 6px; }
+    footer a:hover{ text-decoration:underline; }
+
+    /* Small helpful chips under “Plan Your Trip” */
+    .tips{
+      display:flex; gap:8px; flex-wrap:wrap; margin-top:10px;
+    }
+    .chip{
+      font-size:12px; padding:6px 10px; border-radius:999px;
+      background:#f1f5f9; color:#0f172a; border:1px solid #e2e8f0;
+    }
+
+    /* Keyframes for alerts appearing */
+    @keyframes popin{ from {opacity:0; transform:translateY(6px)} to {opacity:1; transform:translateY(0)} }
+    .alerts > div{ animation: popin .25s ease; }
+
+    @media (max-width:520px){
+      header h1{ font-size:24px; }
+      iframe{ height:260px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="topbar">
+    <div class="topbar-inner">
+      <div class="brand">🌍 AI Trip Planner <span class="pill">Prototype</span></div>
+      <div class="pill">Offline & PDF Ready</div>
+    </div>
+  </div>
+
+  <!-- Homepage Header -->
+  <header>
+    <h1>🌍 AI Trip Planner</h1>
+    <p>Your Smart Companion for Hassle-Free Travel ✈️</p>
+  </header>
+
+  <div class="content">
+    <!-- Feature List Section -->
+    <div class="card">
+      <h2>✨ Features of Our Prototype</h2>
+      <ul>
+        <li>🤖 <b>AI-powered itinerary generator:</b> Creates personalized, day-by-day itineraries based on user preferences, budget, and travel dates.</li>
+        <li>⏰ <b>Real-time updates and alerts:</b> Notifies about flight delays, weather changes, and price shifts.</li>
+        <li>🛒 <b>Seamless booking integrations:</b> Book flights, hotels, and activities directly.</li>
+        <li>🎯 <b>Personalized recommendations:</b> Suggests destinations, activities, and dining based on history & interests.</li>
+        <li>💰 <b>Budget optimization:</b> Provides cost breakdowns and affordable suggestions.</li>
+        <li>👥 <b>Collaborative planning:</b> Enables group planning with real-time updates.</li>
+        <li>📴 <b>Offline access:</b> Download itineraries for use without internet.</li>
+        <li>🗺️ <b>Interactive maps & navigation:</b> Google Maps integration with routes & POIs.</li>
+        <li>🌐 <b>Multilingual support:</b> Assistance in multiple languages.</li>
+      </ul>
+    </div>
+
+    <!-- Trip Planner Input -->
+    <div class="card">
+      <h2>Plan Your Trip</h2>
+      <div class="tips">
+        <span class="chip">Try: New Delhi</span>
+        <span class="chip">Budget idea: 25000</span>
+        <span class="chip">Dates: next month</span>
+      </div>
+      <label>Name:</label><input id="name" type="text" placeholder="Enter full name">
+      <label>Destination:</label><input id="destination" type="text" placeholder="e.g. New Delhi">
+      <label>Start Date:</label><input id="start" type="date">
+      <label>End Date:</label><input id="end" type="date">
+      <label>Budget (₹):</label><input id="budget" type="number" min="0" placeholder="e.g. 25000">
+      <label>Interest:</label>
+      <select id="interest">
+        <option value="culture">Culture</option>
+        <option value="adventure">Adventure</option>
+        <option value="relaxation">Relaxation</option>
+      </select>
+      <button id="generateBtn">✨ Generate Itinerary</button>
+    </div>
+
+    <!-- Itinerary Output -->
+    <div class="card">
+      <h2>Your Itinerary</h2>
+      <div id="itineraryOutput" class="itinerary"></div>
+      <iframe id="mapFrame" src="" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>
+      <div class="button-row" style="margin-top:10px">
+        <button id="saveBtn">💾 Save Offline</button>
+        <button id="loadBtn">📂 Load Saved</button>
+        <button id="downloadBtn">⬇ Download</button>
+      </div>
+    </div>
+
+    <!-- Booking System -->
+    <div class="card">
+      <h2>Bookings</h2>
+      <button id="bookBtn">📌 Book Current Itinerary</button>
+      <div id="bookingsOutput" style="margin-top:10px"></div>
+    </div>
+
+    <!-- Live Alerts -->
+    <div class="card">
+      <h2>Live Alerts</h2>
+      <div id="alertsOutput" class="alerts"></div>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <footer>
+    <p>© 2025 AI Trip Planner | Built for Hackathons & Travel Enthusiasts 🌍</p>
+    <p>
+      <a href="#">About</a> | 
+      <a href="#">Contact</a> | 
+      <a href="#">Privacy</a>
+    </p>
+  </footer>
+
+  <script>
+  let currentItinerary = null;
+
+  // generate itinerary
+  function generateItinerary(){
+    const name = document.getElementById('name').value;
+    const destination = document.getElementById('destination').value;
+    const start = document.getElementById('start').value;
+    const end = document.getElementById('end').value;
+    const budget = document.getElementById('budget').value;
+    const interest = document.getElementById('interest').value;
+    const items = [
+      {day:1, title:"Arrival", desc:"Check-in, explore local streets"},
+      {day:2, title:"Main Highlights", desc:"Visit monuments, museums, local food"},
+      {day:3, title:"Activities", desc: interest==="adventure"?"Hiking & outdoor fun":"Relax at local cafes"}
+    ];
+    currentItinerary = { owner:name, destination, start, end, budget, interest, items };
+    renderItinerary(currentItinerary);
+    updateMap(destination);
+  }
+
+  // render itinerary
+  function renderItinerary(it){
+    const out = document.getElementById('itineraryOutput');
+    out.innerHTML = `<b>👤 ${it.owner}</b> → <b>${it.destination}</b> (${it.start} to ${it.end})<br>💰 Budget: ₹${it.budget}, 🎯 Interest: ${it.interest}`;
+    it.items.forEach(d=>{
+      out.innerHTML += `<div class='day-card'>🗓️ Day ${d.day}: <b>${d.title}</b><br>${d.desc}</div>`;
+    });
+  }
+
+  // update Google Maps (kept same approach)
+  function updateMap(destination){
+    const map = document.getElementById("mapFrame");
+    const query = encodeURIComponent(destination);
+    map.src = `https://www.google.com/maps?q=${query}&output=embed`;
+  }
+
+  // offline save/load
+  function saveItinerary(){ if(currentItinerary){ localStorage.setItem('trip',JSON.stringify(currentItinerary)); alert("Saved offline ✅"); } }
+  function loadItinerary(){ const it = JSON.parse(localStorage.getItem('trip')); if(it){ currentItinerary=it; renderItinerary(it); updateMap(it.destination);} }
+
+  // download JSON
+  function downloadJSON(it){
+    const blob = new Blob([JSON.stringify(it,null,2)],{type:"application/json"});
+    const a = document.createElement('a');
+    a.href=URL.createObjectURL(blob);
+    a.download="trip.json"; a.click();
+  }
+
+  // Helper: wrap text for jsPDF
+  function wrap(doc, text, width){
+    return doc.splitTextToSize(String(text || ""), width);
+  }
+
+  // Optional: base64 header banner (transparent PNG). Leave empty string to skip.
+  const BANNER_IMG = ""; // e.g. data:image/png;base64,iVBORw0...
+
+  // download PDF (enhanced with wrapping and optional banner)
+  function downloadPDF(it){
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ unit: "mm", format: "a4" });
+
+    // Top banner (optional)
+    let cursorY = 12;
+    if (BANNER_IMG){
+      try{ doc.addImage(BANNER_IMG, "PNG", 0, 0, 210, 25); cursorY = 30; }catch(e){}
+    }
+
+    doc.setFont("helvetica","bold"); doc.setFontSize(18);
+    doc.text("🌍 AI Trip Planner",105,cursorY,{align:"center"}); cursorY += 10;
+
+    doc.setFontSize(12); doc.setFont("helvetica","normal");
+    doc.text(wrap(doc, `👤 Name: ${it.owner}`, 170), 20, cursorY); cursorY += 8;
+    doc.text(wrap(doc, `📍 Destination: ${it.destination}`, 170), 20, cursorY); cursorY += 8;
+    doc.text(wrap(doc, `🗓️ Dates: ${it.start} → ${it.end}`, 170), 20, cursorY); cursorY += 8;
+    doc.text(wrap(doc, `💰 Budget: ₹${it.budget}`, 170), 20, cursorY); cursorY += 8;
+    doc.text(wrap(doc, `🎯 Interest: ${it.interest}`, 170), 20, cursorY); cursorY += 6;
+
+    doc.line(20, cursorY, 190, cursorY); cursorY += 8;
+    doc.setFont("helvetica","bold"); doc.setFontSize(14);
+    doc.text("🗓️ Day-wise Itinerary",20,cursorY); cursorY += 8;
+
+    it.items.forEach(day=>{
+      // auto page break
+      if (cursorY > 270){ doc.addPage(); cursorY = 20; }
+      doc.setFont("helvetica","bold"); doc.setFontSize(12);
+      doc.text(wrap(doc, `Day ${day.day}: ${day.title}`, 170), 20, cursorY);
+      cursorY += 6;
+      doc.setFont("helvetica","normal");
+      const wrapped = wrap(doc, `${day.desc}`, 165);
+      wrapped.forEach(line=>{
+        if (cursorY > 280){ doc.addPage(); cursorY = 20; }
+        doc.text(line, 25, cursorY);
+        cursorY += 6;
+      });
+      cursorY += 4;
+    });
+
+    doc.setFontSize(10); doc.setFont("helvetica","italic");
+    doc.text("✨ Generated by AI Trip Planner Prototype",105,285,{align:"center"});
+    doc.save(`${it.owner||"trip"}-${it.destination}.pdf`);
+  }
+
+  // bookings
+  function bookItinerary(){
+    if(!currentItinerary) return alert("No itinerary yet!");
+    let bookings=JSON.parse(localStorage.getItem("bookings")||"[]");
+    bookings.push(currentItinerary); localStorage.setItem("bookings",JSON.stringify(bookings));
+    showBookings();
+  }
+  function showBookings(){
+    const div=document.getElementById("bookingsOutput");
+    const bookings=JSON.parse(localStorage.getItem("bookings")||"[]");
+    div.innerHTML="";
+    bookings.forEach((b,i)=>{
+      div.innerHTML+=`<div class="day-card">📍 ${b.destination} (${b.start} - ${b.end}) <button onclick="cancelBooking(${i})">❌ Cancel</button></div>`;
+    });
+  }
+  function cancelBooking(i){
+    let bookings=JSON.parse(localStorage.getItem("bookings")||"[]");
+    bookings.splice(i,1); localStorage.setItem("bookings",JSON.stringify(bookings));
+    showBookings();
+  }
+
+  // alerts
+  function randomAlert(){
+    const msgs=["⛅ Weather update: light rain","✈️ Flight delayed by 30 mins","🚗 Traffic heavy near airport"];
+    return msgs[Math.floor(Math.random()*msgs.length)];
+  }
+  function pushAlert(){
+    const div=document.getElementById("alertsOutput");
+    div.innerHTML+="<div>🔔 "+randomAlert()+"</div>";
+  }
+  setInterval(pushAlert,8000);
+
+  // listeners
+  document.getElementById("generateBtn").addEventListener("click",generateItinerary);
+  document.getElementById("saveBtn").addEventListener("click",saveItinerary);
+  document.getElementById("loadBtn").addEventListener("click",loadItinerary);
+  document.getElementById("downloadBtn").addEventListener("click",()=>{ 
+    if(currentItinerary){
+      if(confirm("Download as PDF? Cancel = JSON")){
+        downloadPDF(currentItinerary);
+      } else {
+        downloadJSON(currentItinerary);
+      }
+    }
+  });
+  document.getElementById("bookBtn").addEventListener("click",bookItinerary);
+
+  // initial
+  showBookings();
+  </script>
+</body>
+</html>
