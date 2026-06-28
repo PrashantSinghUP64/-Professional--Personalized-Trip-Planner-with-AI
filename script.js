@@ -4,7 +4,7 @@
 document.addEventListener('DOMContentLoaded', () => { // ensure DOM exists before wiring [web:48][web:59]
 
   // Element references
-  const form = document.getElementById('');
+  const form = document.getElementById('TripForm');
   const itineraryArea = document.getElementById('itineraryArea');
   const bookingsArea = document.getElementById('bookingsArea');
   const downloadBtn = document.getElementById('downloadItinerary');
